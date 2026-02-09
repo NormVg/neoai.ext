@@ -4,7 +4,7 @@
  */
 const NEOPASS_AI_CONFIG = {
   // Local server URL - change this if running on different port/host
-  serverUrl: 'http://localhost:3001',
+  serverUrl: 'https://neoai.projectkit.shop',
 
   // Endpoints
   endpoints: {

@@ -184,7 +184,7 @@ function extractQuestionCodeAndOptions() {
   };
 }
 
-// Async function to handle question, code, and options extraction
+// Async function to handle question, code, and options extraction - Uses local AI server
 async function handleQuestionExtraction() {
   const { question, code, options } = extractQuestionCodeAndOptions();
 
@@ -192,19 +192,75 @@ async function handleQuestionExtraction() {
     return;
   }
 
-  console.log('Question:', question);
-  console.log('Code:\n', code ? code : 'No code available');
-  console.log('Options:\n', options);
+  console.log('[MCQ] Question:', question);
+  console.log('[MCQ] Code:', code ? code : 'No code');
+  console.log('[MCQ] Options:', options);
 
-  // Send the extracted data to background.js
-  // The clicking will be handled by the clickMCQOption message handler
-  chrome.runtime.sendMessage({
-    action: 'extractData',
-    question: question,
-    code: code,
-    options: options,
-    isMCQ: true
-  });
+  // Parse options into array
+  const optionsArray = options.split('\n').map(opt => {
+    const match = opt.match(/Option \d+: (.+)/);
+    return match ? match[1] : opt;
+  }).filter(opt => opt.trim());
+
+  // Get server URL from config
+  const config = window.NEOPASS_AI_CONFIG || {
+    serverUrl: 'http://localhost:3001',
+    endpoints: { solveMCQ: '/api/solve-mcq' },
+    timeout: 30000
+  };
+
+  const serverUrl = `${config.serverUrl}${config.endpoints.solveMCQ}`;
+
+  try {
+    console.log('[MCQ] Calling local AI server:', serverUrl);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+    const response = await fetch(serverUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: question,
+        options: optionsArray,
+        code: code
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[MCQ] AI server response:', data);
+
+    if (data.success && data.answer !== undefined) {
+      // data.answer is 1-indexed option number
+      const answerIndex = data.answer - 1; // Convert to 0-indexed
+      console.log('[MCQ] Answer is option:', data.answer, '-', data.selectedOption);
+
+      // Click the correct option directly
+      const optionsElements = document.querySelectorAll('div[aria-labelledby="each-option"]');
+      if (optionsElements.length > answerIndex && answerIndex >= 0) {
+        const optionToClick = optionsElements[answerIndex];
+        // Find clickable element inside (radio button or the option itself)
+        const radio = optionToClick.querySelector('input[type="radio"]') ||
+          optionToClick.querySelector('[role="radio"]') ||
+          optionToClick;
+        radio.click();
+        console.log('[MCQ] ✅ Clicked option:', data.answer);
+      } else {
+        console.error('[MCQ] Option index out of range:', answerIndex, 'Options count:', optionsElements.length);
+      }
+    } else {
+      console.error('[MCQ] No answer in response:', data);
+    }
+  } catch (error) {
+    console.error('[MCQ] Error calling local AI server:', error);
+  }
 }
 
 // Function to extract coding question details
