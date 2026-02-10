@@ -17,11 +17,11 @@ AI-powered exam assistant for iamneo. Uses Google Gemini to solve coding problem
 
 ## Shortcuts
 
-| Action | Mac | Windows |
-|--------|-----|---------|
-| **Instant Solve** (code/MCQ) | `⌥ + Shift + A` | `Alt + Shift + A` |
-| **Human-like typing** | `⌥ + Shift + L` | `Alt + Shift + L` |
-| **Pause/Resume typing** | `⌥ + Shift + P` | `Alt + Shift + P` |
+| Action | Shortcut |
+|--------|----------|
+| **Instant Solve** (code/MCQ) | `Ctrl + Shift + .` |
+| **Human-like typing** | `Ctrl + Shift + ,` |
+| **Pause/Resume typing** | `Ctrl + Shift + /` |
 
 ---
 

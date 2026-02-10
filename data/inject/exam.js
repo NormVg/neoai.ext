@@ -96,9 +96,8 @@ if (typeof window.isMac === 'undefined') {
       return;
     }
 
-    // Option + Shift + L on macOS, Alt + Shift + L on others
-    const primaryModifierT = event.altKey;
-    if (primaryModifierT && event.shiftKey && event.code === "KeyL") {
+    // Ctrl+Shift+, (Comma) on all platforms
+    if (event.ctrlKey && event.shiftKey && event.code === 'Comma') {
       event.preventDefault();
 
       // If already typing (code has been fetched), just continue typing
@@ -409,9 +408,9 @@ if (typeof window.isMac === 'undefined') {
     }
   });
 
-  // Keyboard listener for Pause/Resume typing (Option+Shift+P)
+  // Keyboard listener for Pause/Resume typing (Ctrl+Shift+/)
   document.addEventListener('keydown', function (event) {
-    if (event.altKey && event.shiftKey && event.code === 'KeyP') {
+    if (event.ctrlKey && event.shiftKey && event.code === 'Slash') {
       event.preventDefault();
 
       if (isTyping) {

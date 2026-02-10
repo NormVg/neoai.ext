@@ -440,9 +440,10 @@ function solveIamneoExamly() {
   }
 }
 document.addEventListener('keydown', (event) => {
-  // Option+Shift+A (Alt+Shift+A on all platforms)
-  if (event.altKey && event.shiftKey && event.code === 'KeyA') {
-    console.log('[content.js] Option+Shift+A pressed, calling solveIamneoExamly...');
+  // Ctrl+Shift+. (Period) on all platforms
+  if (event.ctrlKey && event.shiftKey && event.code === 'Period') {
+    event.preventDefault();
+    console.log('[content.js] Ctrl+Shift+. pressed, calling solveIamneoExamly...');
     solveIamneoExamly();
   }
 });
