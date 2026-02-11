@@ -100,6 +100,12 @@ if (typeof window.isMac === 'undefined') {
     if (event.ctrlKey && event.shiftKey && event.code === 'Comma') {
       event.preventDefault();
 
+      // Login gate - require authentication
+      if (!window.__NEOAI_AUTH_TOKEN__) {
+        console.log('[exam.js] Not logged in - shortcut blocked');
+        return;
+      }
+
       // If already typing (code has been fetched), just continue typing
       if (typingInitialized && isTyping) {
         typeNextCharacter();

@@ -1062,21 +1062,19 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
         
         // Check if user is logged in
         const {
-            accessToken,
-            refreshToken,
-            isPro
+            accessToken
         } = await getTokens();
 
-        // If not logged in and no custom API configured, require custom API
-        if (!accessToken || !refreshToken) {
+        // If not logged in and no custom API configured, require login
+        if (!accessToken) {
             unblockRequests();
             
             // Show toast notification if tabId is available
             if (tabId) {
-                showToast(tabId, 'Please configure your API key or login with Pro', true, 'Free users must provide their own API keys in the Settings tab. Click the extension icon to configure.');
+                showToast(tabId, 'Please log in to use NeoAI', true, 'You need to be logged in to use this feature. Click the extension icon to sign in.');
             }
             
-            // Open popup to Pro tab after a short delay
+            // Open popup after a short delay
             setTimeout(() => {
                 try {
                     chrome.action.openPopup();
@@ -1086,17 +1084,16 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
             }, 1000);
             
             return { 
-                error: 'Please configure your custom API key in Settings or login with Pro to use our proxy-server.', 
+                error: 'Please log in to use NeoAI.', 
                 errorType: 'auth',
-                detailedInfo: 'Free users must provide their own API keys in the Settings tab to use this extension.'
+                detailedInfo: 'You need to be logged in to use this feature.'
             };
         }
 
         // Always use Pro endpoint
         const API_URL = `${API_BASE_URL}/api/pro-text`;
         const body = {
-            prompt: text,
-            refreshToken: refreshToken  // Required for server-side automatic token refresh
+            prompt: text
         };
 
         if (isMCQ) {
@@ -1116,7 +1113,7 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
             // If auth fails, it means refresh token is also invalid/expired
             if (!response.ok && (response.status === 401 || response.status === 403)) {
                 console.log('[queryRequest] Authentication failed - session expired');
-                chrome.storage.local.remove(['accessToken', 'refreshToken', 'loggedIn']);
+                chrome.storage.local.remove(['accessToken', 'loggedIn']);
                 return { 
                     error: 'Session expired. Please log in again.', 
                     errorType: 'auth',
@@ -1163,7 +1160,7 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
                         detailedInfo = 'This service requires an active Pro subscription. Please upgrade or renew your Pro subscription.';
                         
                         // Auto-logout user when subscription expires
-                        chrome.storage.local.remove(['accessToken', 'refreshToken', 'loggedIn', 'username', 'isPro', 'loginTimestamp']);
+                        chrome.storage.local.remove(['accessToken', 'loggedIn', 'username', 'loginTimestamp']);
                         console.log('🔒 Auto-logout: Pro subscription expired');
                     } else if (errorData.message && errorData.message.includes('star')) {
                         errorMessage = 'Please star the repository to use this service.';
@@ -1411,12 +1408,12 @@ async function queryCustomAPI(text, isMCQ, isMultipleChoice, config) {
 }
 
 
-const API_BASE_URL = 'https://api.neopass.tech';
+const API_BASE_URL = 'https://neoai.projectkit.shop';
 // Listen for messages from Chrome runtime for ChatBot
 // Helper function to get tokens from chrome storage
 async function getTokens() {
     return new Promise((resolve) => {
-        chrome.storage.local.get(['accessToken', 'refreshToken', 'isPro'], resolve);
+        chrome.storage.local.get(['accessToken'], resolve);
     });
 }
 
@@ -1617,14 +1614,12 @@ async function handleChatMessage(message, sender) {
         
         // Check if user is logged in
         const {
-            accessToken,
-            refreshToken,
-            isPro
+            accessToken
         } = await getTokens();
 
-        // If not logged in and no custom API configured, require custom API
-        if (!accessToken || !refreshToken) {
-            sendChatErrorResponse(sender.tab.id, "Please configure your custom API key in Settings or login with Pro to use our proxy-server.");
+        // If not logged in and no custom API configured, require login
+        if (!accessToken) {
+            sendChatErrorResponse(sender.tab.id, "Please log in to use NeoAI.");
             return;
         }
 
@@ -1633,8 +1628,7 @@ async function handleChatMessage(message, sender) {
 
         const requestBody = {
             message: message.message,
-            context: message.context,
-            refreshToken: refreshToken  // Send refresh token for server-side auto-refresh
+            context: message.context
         };
 
         // Include image if present
@@ -1665,7 +1659,7 @@ async function handleChatMessage(message, sender) {
             }
             
             // Authentication failed - clear tokens
-            chrome.storage.local.remove(['accessToken', 'refreshToken', 'loggedIn']);
+            chrome.storage.local.remove(['accessToken', 'loggedIn']);
             sendChatErrorResponse(sender.tab.id, "Session expired. Please log in again.");
             return;
         }
@@ -1697,7 +1691,7 @@ async function handleChatMessage(message, sender) {
                         errorMessage = "Your Pro subscription is required or has expired. Please upgrade or renew your Pro subscription to continue using this service.";
                         
                         // Auto-logout user when subscription expires
-                        chrome.storage.local.remove(['accessToken', 'refreshToken', 'loggedIn', 'username', 'isPro', 'loginTimestamp']);
+                        chrome.storage.local.remove(['accessToken', 'loggedIn', 'username', 'loginTimestamp']);
                         console.log('🔒 Auto-logout: Pro subscription expired');
                     } else if (errorData.message && errorData.message.includes('star')) {
                         errorMessage = "Please star the repository to use the chat feature.";
@@ -2524,10 +2518,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Add storage change listener for remote logout
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local') {
-        // Check if refreshToken was removed (remote logout)
-        if (changes.refreshToken && changes.refreshToken.newValue === undefined) {
+        // Check if accessToken was removed (remote logout)
+        if (changes.accessToken && changes.accessToken.newValue === undefined) {
             // Clear all auth data
-            chrome.storage.local.remove(['accessToken', 'refreshToken', 'loggedIn', 'username']);
+            chrome.storage.local.remove(['accessToken', 'loggedIn', 'username']);
 
             // Notify active tabs about logout
             chrome.tabs.query({}, function(tabs) {
@@ -2680,7 +2674,7 @@ async function checkAndHandleSessionExpiration() {
                 console.log('24-hour session timeout reached, logging out user');
 
                 // Clear all auth data and custom API keys
-                await chrome.storage.local.remove(['accessToken', 'refreshToken', 'loggedIn', 'username', 'loginTimestamp', 'stealth', 'useCustomAPI', 'aiProvider', 'customEndpoint', 'customAPIKey', 'customModelName']);
+                await chrome.storage.local.remove(['accessToken', 'loggedIn', 'username', 'loginTimestamp', 'stealth', 'useCustomAPI', 'aiProvider', 'customEndpoint', 'customAPIKey', 'customModelName']);
 
                 // Refresh all tabs to apply logout state
                 chrome.tabs.query({}, function(tabs) {

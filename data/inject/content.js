@@ -6,6 +6,38 @@ window.addEventListener('blur', function () {
 window.isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
   navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
 
+// Auth token cache for API requests
+let _neoaiAuthToken = '';
+(function loadAuthToken() {
+  chrome.storage.local.get(['accessToken'], function(result) {
+    _neoaiAuthToken = result.accessToken || '';
+  });
+})();
+chrome.storage.onChanged.addListener(function(changes, area) {
+  if (area === 'local' && changes.accessToken) {
+    _neoaiAuthToken = changes.accessToken.newValue || '';
+  }
+});
+
+// Simple toast notification for auth messages
+function showNeopassToast(message, isError) {
+  const existing = document.getElementById('neoai-auth-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'neoai-auth-toast';
+  toast.textContent = message;
+  toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:999999;padding:12px 20px;' +
+    'border-radius:8px;font-size:14px;font-family:system-ui,sans-serif;color:#fff;' +
+    'background:' + (isError ? '#dc2626' : '#333') + ';box-shadow:0 4px 12px rgba(0,0,0,0.3);' +
+    'transition:opacity 0.3s;opacity:1;';
+  document.body.appendChild(toast);
+  setTimeout(function() {
+    toast.style.opacity = '0';
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 3000);
+}
+
 // Automatically enable text selection on all websites
 (function () {
   // Function to enable text selection globally
@@ -217,9 +249,19 @@ async function handleQuestionExtraction() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
+    // Auth gate - require login
+    if (!_neoaiAuthToken) {
+      console.error('[MCQ] Not logged in - cannot call AI server');
+      showNeopassToast('Please log in to use NeoAI', true);
+      return;
+    }
+
     const response = await fetch(serverUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${_neoaiAuthToken}`
+      },
       body: JSON.stringify({
         question: question,
         options: optionsArray,
@@ -229,6 +271,11 @@ async function handleQuestionExtraction() {
     });
 
     clearTimeout(timeoutId);
+
+    if (response.status === 401) {
+      showNeopassToast('Session expired. Please log in again.', true);
+      throw new Error('Authentication failed');
+    }
 
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`);
@@ -379,9 +426,19 @@ async function extractCodingQuestion() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
+    // Auth gate - require login
+    if (!_neoaiAuthToken) {
+      console.error('[extractCodingQuestion] Not logged in - cannot call AI server');
+      showNeopassToast('Please log in to use NeoAI', true);
+      return;
+    }
+
     const response = await fetch(serverUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${_neoaiAuthToken}`
+      },
       body: JSON.stringify({
         question: questionText,
         language: programmingLanguage,
@@ -393,6 +450,11 @@ async function extractCodingQuestion() {
     });
 
     clearTimeout(timeoutId);
+
+    if (response.status === 401) {
+      showNeopassToast('Session expired. Please log in again.', true);
+      throw new Error('Authentication failed');
+    }
 
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`);
@@ -431,6 +493,12 @@ async function extractCodingQuestion() {
 }
 
 function solveIamneoExamly() {
+  // Login gate - require authentication
+  if (!_neoaiAuthToken) {
+    showNeopassToast('Please log in to use NeoAI', true);
+    return;
+  }
+
   // Check if this is a coding question or MCQ
   const codingQuestionElement = document.querySelector('div[aria-labelledby="input-format"]');
   if (codingQuestionElement) {
@@ -1399,6 +1467,13 @@ window.addEventListener('NEOPASS_REQUEST_CODE_TYPED', async function (event) {
   try {
     console.log('[content.js] Calling local AI server:', serverUrl);
 
+    // Auth gate - require login
+    if (!_neoaiAuthToken) {
+      console.error('[content.js] Not logged in - cannot call AI server');
+      showNeopassToast('Please log in to use NeoAI', true);
+      return;
+    }
+
     // Create AbortController for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout);
@@ -1406,7 +1481,8 @@ window.addEventListener('NEOPASS_REQUEST_CODE_TYPED', async function (event) {
     const response = await fetch(serverUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${_neoaiAuthToken}`
       },
       body: JSON.stringify({
         question: question,
@@ -1419,6 +1495,11 @@ window.addEventListener('NEOPASS_REQUEST_CODE_TYPED', async function (event) {
     });
 
     clearTimeout(timeoutId);
+
+    if (response.status === 401) {
+      showNeopassToast('Session expired. Please log in again.', true);
+      throw new Error('Authentication failed');
+    }
 
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`);

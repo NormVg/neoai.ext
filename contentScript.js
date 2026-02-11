@@ -3,6 +3,35 @@ if (typeof chrome === "undefined") {
   // Handle the case where chrome is not defined (like in Firefox)
 }
 
+// Inject auth token into page context so content.js/exam.js can use it
+(function injectAuthToken() {
+  chrome.storage.local.get(['accessToken', 'loggedIn'], function(result) {
+    const token = result.accessToken || '';
+    const loggedIn = result.loggedIn || false;
+    const script = document.createElement('script');
+    script.textContent = `window.__NEOAI_AUTH_TOKEN__ = ${JSON.stringify(token)}; window.__NEOAI_LOGGED_IN__ = ${JSON.stringify(loggedIn)};`;
+    (document.head || document.documentElement).prepend(script);
+    script.remove();
+  });
+})();
+
+// Keep injected token updated when storage changes
+chrome.storage.onChanged.addListener(function(changes, area) {
+  if (area === 'local' && (changes.accessToken || changes.loggedIn)) {
+    const token = changes.accessToken ? (changes.accessToken.newValue || '') : undefined;
+    const loggedIn = changes.loggedIn ? (changes.loggedIn.newValue || false) : undefined;
+    let code = '';
+    if (token !== undefined) code += `window.__NEOAI_AUTH_TOKEN__ = ${JSON.stringify(token)};`;
+    if (loggedIn !== undefined) code += `window.__NEOAI_LOGGED_IN__ = ${JSON.stringify(loggedIn)};`;
+    if (code) {
+      const script = document.createElement('script');
+      script.textContent = code;
+      (document.head || document.documentElement).prepend(script);
+      script.remove();
+    }
+  }
+});
+
 // Always inject mock_code.js interceptor to handle extension detection (even when not logged in)
 (function injectMockCode() {
   const mockScript = document.createElement('script');
