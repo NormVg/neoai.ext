@@ -217,7 +217,7 @@ chrome.runtime.onMessage.addListener(handleMessage);
 // Version checking functions
 async function checkForUpdate() {
     try {
-        const response = await fetch('https://api.github.com/repos/Max-Eee/NeoPass/releases/latest');
+        const response = await fetch('https://api.github.com/repos/NormVg/neoai.ext/releases/latest');
         const data = await response.json();
         const latestVersion = data.tag_name.replace('v', '');
         const currentVersion = chrome.runtime.getManifest().version;
@@ -344,7 +344,7 @@ function showUpdateToast(tabId, message, latestVersion) {
                                 transition: background-color 0.2s;
                             `;
 
-                            // Header container with NeoPass title and close button
+                            // Header container with NeoAI title and close button
                             const header = document.createElement('div');
                             header.style.cssText = `
                                 display: flex;
@@ -355,9 +355,9 @@ function showUpdateToast(tabId, message, latestVersion) {
                                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                             `;
 
-                            // NeoPass title
+                            // NeoAI title
                             const title = document.createElement('div');
-                            title.innerHTML = 'NeoPass Extension';
+                            title.innerHTML = 'NeoAI';
                             title.style.cssText = `
                                 font-size: 16px;
                                 font-weight: bold;
@@ -417,8 +417,8 @@ function showUpdateToast(tabId, message, latestVersion) {
                                 return link;
                             };
 
-                            const downloadLink = createLink('⭳ Download Latest', 'https://github.com/Max-Eee/NeoPass/archive/refs/heads/main.zip');
-                            const websiteLink = createLink('Website', 'https://freeneopass.vercel.app');
+                            const downloadLink = createLink('⭳ Download Latest', 'https://github.com/NormVg/neoai.ext/archive/refs/heads/main.zip');
+                            const websiteLink = createLink('Website', 'https://neoai.projectkit.shop');
 
                             // Add hover effects
                             gradientContainer.onmouseover = () => {
@@ -438,7 +438,7 @@ function showUpdateToast(tabId, message, latestVersion) {
                             // Click handlers
                             gradientContainer.onclick = (e) => {
                                 if (e.target === gradientContainer || e.target === toast || e.target === messageDiv) {
-                                    window.open('https://github.com/Max-Eee/NeoPass/releases/latest');
+                                    window.open('https://github.com/NormVg/neoai.ext/releases/latest');
                                 }
                             };
 
@@ -1120,7 +1120,7 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
                 return { 
                     error: 'Session expired. Please log in again.', 
                     errorType: 'auth',
-                    detailedInfo: 'Your session has expired. Please log in again to continue using NeoPass features.'
+                    detailedInfo: 'Your session has expired. Please log in again to continue using NeoAI features.'
                 };
             }
 

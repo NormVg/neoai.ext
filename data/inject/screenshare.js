@@ -166,7 +166,7 @@ function showPopup(resolve, reject, constraints, originalGetDisplayMedia) {
     toast.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
             <div style="font-size: 16px; font-weight: bold; background: linear-gradient(to right, #3b82f6, #8b5cf6, #ec4899); -webkit-background-clip: text; background-clip: text; color: transparent;">
-                NeoPass Extension
+                NeoAI
             </div>
             <span class="close-btn" style="cursor: pointer; font-size: 20px; color: rgba(255, 255, 255, 0.8); transition: color 0.2s; line-height: 1; padding: 4px 8px;">×</span>
         </div>

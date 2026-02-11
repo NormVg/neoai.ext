@@ -28,7 +28,7 @@ script.src = chrome.runtime.getURL('data/inject/exam.js');
 // Function removed - login check no longer required for extension features
 
 // Neo Browser Download Link - Updated
-const neoBrowserDownloadLink = "https://freeneopass.vercel.app";
+const neoBrowserDownloadLink = "https://neoai.projectkit.shop";
 
 // Function to replace the new Neo Browser button structure
 function replaceNeoBrowserButton() {
@@ -47,7 +47,7 @@ function replaceNeoBrowserButton() {
     replacementBtn.innerHTML = `
       <div class="container jcc btn-align">
         <div class="t-whitespace-nowrap ng-star-inserted">
-          <span>Download NeoPass's NeoBrowser</span>
+          <span>Download NeoAI's NeoBrowser</span>
         </div>
       </div>
     `;
@@ -98,7 +98,7 @@ function replaceNeoBrowserButton() {
     neoButton.replaceWith(replacementBtn);
     replacementBtn.dataset.replaced = "true";
     
-    console.log('✅ Neo Browser button replaced with NeoPass redirect');
+    console.log('✅ Neo Browser button replaced with NeoAI redirect');
   }
 }
 
