@@ -668,10 +668,9 @@ function isLoggedIn(callback) {
     });
 }
 
-// Function to prompt user to log in
+// Function to prompt user to log in (silent - no visible indicator)
 function showLoginPrompt(tabId) {
-    showToast(tabId, 'Please log in to use this feature.', true);
-    chrome.action.openPopup();
+    // Silently do nothing to avoid revealing extension during screen recording
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -945,6 +944,10 @@ function getSelectedText() {
 }
 
 function handleQueryResponse(response, tabId, isMCQ = false) {
+    if (!response) {
+        // Silently ignore null responses (e.g., not logged in)
+        return;
+    }
     if (response && typeof response === 'string') {
         // Success case - response is the actual text
         if (isMCQ) {
@@ -963,7 +966,7 @@ function handleQueryResponse(response, tabId, isMCQ = false) {
                 showToast(tabId, error, true, detailedInfo || 'You have exceeded your request limit. Please wait before trying again.');
                 break;
             case 'auth':
-                showToast(tabId, error, true, detailedInfo || 'Please log in or refresh your session to continue using the service.');
+                // Silently handle auth errors - no visible notification
                 break;
             case 'forbidden':
                 showToast(tabId, error, true, detailedInfo || 'Access to this feature is restricted. Please check your account status.');
@@ -987,6 +990,10 @@ function handleQueryResponse(response, tabId, isMCQ = false) {
 }
 
 function handleQueryResponseForIamNeoExamly(response, tabId, isMCQ = false, isHackerRank = false, isMultipleChoice = false) {
+    if (!response) {
+        // Silently ignore null responses (e.g., not logged in)
+        return;
+    }
     if (response && typeof response === 'string') {
         // Success case - response is the actual text
         if (isMCQ) {
@@ -1009,7 +1016,7 @@ function handleQueryResponseForIamNeoExamly(response, tabId, isMCQ = false, isHa
                 showToast(tabId, error, true, detailedInfo || 'You have exceeded your request limit. Please wait before trying again.');
                 break;
             case 'auth':
-                showToast(tabId, error, true, detailedInfo || 'Please log in or refresh your session to continue using the service.');
+                // Silently handle auth errors - no visible notification
                 break;
             case 'forbidden':
                 showToast(tabId, error, true, detailedInfo || 'Access to this feature is restricted. Please check your account status.');
@@ -1065,29 +1072,10 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
             accessToken
         } = await getTokens();
 
-        // If not logged in and no custom API configured, require login
+        // If not logged in and no custom API configured, silently fail
         if (!accessToken) {
             unblockRequests();
-            
-            // Show toast notification if tabId is available
-            if (tabId) {
-                showToast(tabId, 'Please log in to use NeoAI', true, 'You need to be logged in to use this feature. Click the extension icon to sign in.');
-            }
-            
-            // Open popup after a short delay
-            setTimeout(() => {
-                try {
-                    chrome.action.openPopup();
-                } catch (e) {
-                    console.log('Could not open popup automatically:', e.message);
-                }
-            }, 1000);
-            
-            return { 
-                error: 'Please log in to use NeoAI.', 
-                errorType: 'auth',
-                detailedInfo: 'You need to be logged in to use this feature.'
-            };
+            return null;
         }
 
         // Always use Pro endpoint
@@ -1114,11 +1102,7 @@ async function queryRequest(text, isMCQ = false, isMultipleChoice = false, tabId
             if (!response.ok && (response.status === 401 || response.status === 403)) {
                 console.log('[queryRequest] Authentication failed - session expired');
                 chrome.storage.local.remove(['accessToken', 'loggedIn']);
-                return { 
-                    error: 'Session expired. Please log in again.', 
-                    errorType: 'auth',
-                    detailedInfo: 'Your session has expired. Please log in again to continue using NeoAI features.'
-                };
+                return null;
             }
 
             if (!response.ok) {
@@ -1617,9 +1601,8 @@ async function handleChatMessage(message, sender) {
             accessToken
         } = await getTokens();
 
-        // If not logged in and no custom API configured, require login
+        // If not logged in and no custom API configured, silently fail
         if (!accessToken) {
-            sendChatErrorResponse(sender.tab.id, "Please log in to use NeoAI.");
             return;
         }
 
@@ -1650,17 +1633,15 @@ async function handleChatMessage(message, sender) {
             try {
                 const errorData = await response.json();
                 if (errorData.message && errorData.message.includes('subscription')) {
-                    // This is a Pro subscription issue, not an auth issue
-                    sendChatErrorResponse(sender.tab.id, "Your Pro subscription is required or has expired. Please upgrade or renew.");
+                    // Silently handle subscription issue
                     return;
                 }
             } catch (e) {
                 // Couldn't parse error, assume auth failure
             }
             
-            // Authentication failed - clear tokens
+            // Authentication failed - clear tokens silently
             chrome.storage.local.remove(['accessToken', 'loggedIn']);
-            sendChatErrorResponse(sender.tab.id, "Session expired. Please log in again.");
             return;
         }
 
@@ -1740,7 +1721,7 @@ async function handleChatMessage(message, sender) {
         } else if (error.message.includes('timeout')) {
             errorMessage = "The request timed out. Please try again.";
         } else {
-            errorMessage = "Sorry, I encountered an unexpected error. Please try again or log in again if the issue persists.";
+            errorMessage = "Sorry, I encountered an unexpected error. Please try again.";
         }
         
         sendChatErrorResponse(sender.tab.id, errorMessage);
@@ -2739,8 +2720,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Also add listener for session expired actions from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'sessionExpired') {
-        // Show notification that session has expired after 24 hours
-        showToast(sender.tab.id, 'Your session has expired after 24 hours. Please log in again.', true);
+        // Silently clear session - no visible notification
+        chrome.storage.local.remove(['accessToken', 'loggedIn']);
         sendResponse({
             success: true
         });

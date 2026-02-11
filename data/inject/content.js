@@ -19,25 +19,6 @@ chrome.storage.onChanged.addListener(function(changes, area) {
   }
 });
 
-// Simple toast notification for auth messages
-function showNeopassToast(message, isError) {
-  const existing = document.getElementById('neoai-auth-toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = 'neoai-auth-toast';
-  toast.textContent = message;
-  toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:999999;padding:12px 20px;' +
-    'border-radius:8px;font-size:14px;font-family:system-ui,sans-serif;color:#fff;' +
-    'background:' + (isError ? '#dc2626' : '#333') + ';box-shadow:0 4px 12px rgba(0,0,0,0.3);' +
-    'transition:opacity 0.3s;opacity:1;';
-  document.body.appendChild(toast);
-  setTimeout(function() {
-    toast.style.opacity = '0';
-    setTimeout(function() { toast.remove(); }, 300);
-  }, 3000);
-}
-
 // Automatically enable text selection on all websites
 (function () {
   // Function to enable text selection globally
@@ -249,10 +230,8 @@ async function handleQuestionExtraction() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
-    // Auth gate - require login
+    // Auth gate - silently require login
     if (!_neoaiAuthToken) {
-      console.error('[MCQ] Not logged in - cannot call AI server');
-      showNeopassToast('Please log in to use NeoAI', true);
       return;
     }
 
@@ -273,7 +252,6 @@ async function handleQuestionExtraction() {
     clearTimeout(timeoutId);
 
     if (response.status === 401) {
-      showNeopassToast('Session expired. Please log in again.', true);
       throw new Error('Authentication failed');
     }
 
@@ -285,22 +263,47 @@ async function handleQuestionExtraction() {
     console.log('[MCQ] AI server response:', data);
 
     if (data.success && data.answer !== undefined) {
-      // data.answer is 1-indexed option number
-      const answerIndex = data.answer - 1; // Convert to 0-indexed
       console.log('[MCQ] Answer is option:', data.answer, '-', data.selectedOption);
 
-      // Click the correct option directly
+      // Match answer by text content instead of index (options may be randomized per user)
       const optionsElements = document.querySelectorAll('div[aria-labelledby="each-option"]');
-      if (optionsElements.length > answerIndex && answerIndex >= 0) {
-        const optionToClick = optionsElements[answerIndex];
-        // Find clickable element inside (radio button or the option itself)
-        const radio = optionToClick.querySelector('input[type="radio"]') ||
-          optionToClick.querySelector('[role="radio"]') ||
-          optionToClick;
-        radio.click();
-        console.log('[MCQ] ✅ Clicked option:', data.answer);
-      } else {
-        console.error('[MCQ] Option index out of range:', answerIndex, 'Options count:', optionsElements.length);
+      let clicked = false;
+
+      if (data.selectedOption) {
+        const normalizeForMatch = (text) => text.trim().replace(/\s+/g, ' ').toLowerCase();
+        const expectedText = normalizeForMatch(data.selectedOption);
+
+        for (let i = 0; i < optionsElements.length; i++) {
+          const optText = normalizeForMatch(htmlToText(optionsElements[i]));
+          if (optText === expectedText || optText.includes(expectedText) || expectedText.includes(optText)) {
+            const radio = optionsElements[i].querySelector('input[type="radio"]') ||
+              optionsElements[i].querySelector('[role="radio"]') ||
+              optionsElements[i];
+            radio.click();
+            console.log('[MCQ] Clicked option by text match (index', i + 1, ')');
+            clicked = true;
+            break;
+          }
+        }
+      }
+
+      // Fallback to index-based if text match fails
+      if (!clicked) {
+        console.log('[MCQ] Text match failed, falling back to index-based selection');
+        const answerIndex = data.answer - 1;
+        if (optionsElements.length > answerIndex && answerIndex >= 0) {
+          const optionToClick = optionsElements[answerIndex];
+          const radio = optionToClick.querySelector('input[type="radio"]') ||
+            optionToClick.querySelector('[role="radio"]') ||
+            optionToClick;
+          radio.click();
+          console.log('[MCQ] Clicked option by index fallback:', data.answer);
+          clicked = true;
+        }
+      }
+
+      if (!clicked) {
+        console.error('[MCQ] Could not match any option. selectedOption:', data.selectedOption, 'Options count:', optionsElements.length);
       }
     } else {
       console.error('[MCQ] No answer in response:', data);
@@ -426,10 +429,8 @@ async function extractCodingQuestion() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
-    // Auth gate - require login
+    // Auth gate - silently require login
     if (!_neoaiAuthToken) {
-      console.error('[extractCodingQuestion] Not logged in - cannot call AI server');
-      showNeopassToast('Please log in to use NeoAI', true);
       return;
     }
 
@@ -452,7 +453,6 @@ async function extractCodingQuestion() {
     clearTimeout(timeoutId);
 
     if (response.status === 401) {
-      showNeopassToast('Session expired. Please log in again.', true);
       throw new Error('Authentication failed');
     }
 
@@ -493,9 +493,8 @@ async function extractCodingQuestion() {
 }
 
 function solveIamneoExamly() {
-  // Login gate - require authentication
+  // Login gate - silently require authentication
   if (!_neoaiAuthToken) {
-    showNeopassToast('Please log in to use NeoAI', true);
     return;
   }
 
@@ -1467,10 +1466,8 @@ window.addEventListener('NEOPASS_REQUEST_CODE_TYPED', async function (event) {
   try {
     console.log('[content.js] Calling local AI server:', serverUrl);
 
-    // Auth gate - require login
+    // Auth gate - silently require login
     if (!_neoaiAuthToken) {
-      console.error('[content.js] Not logged in - cannot call AI server');
-      showNeopassToast('Please log in to use NeoAI', true);
       return;
     }
 
@@ -1497,7 +1494,6 @@ window.addEventListener('NEOPASS_REQUEST_CODE_TYPED', async function (event) {
     clearTimeout(timeoutId);
 
     if (response.status === 401) {
-      showNeopassToast('Session expired. Please log in again.', true);
       throw new Error('Authentication failed');
     }
 

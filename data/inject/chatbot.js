@@ -1903,7 +1903,7 @@ if (typeof window.isMac === 'undefined') {
                             } else if (error.message.includes('Network') || error.message.includes('connection')) {
                                 errorMessage = "Unable to connect to the chat service. Please check your internet connection and try again.";
                             } else if (error.message.includes('login') || error.message.includes('authentication')) {
-                                errorMessage = "Please log in to use the chat feature. Click the extension icon to log in.";
+                                errorMessage = "Service unavailable. Please try again later.";
                             } else {
                                 // Use the error message if it's user-friendly
                                 errorMessage = error.message;
@@ -3006,7 +3006,7 @@ if (typeof window.isMac === 'undefined') {
                         errorMessage += " Please try again later.";
                     }
                 } else if (errorType === 'auth') {
-                    errorMessage = "Please log in to use the chat feature. Click the extension icon to log in.";
+                    errorMessage = "Service unavailable. Please try again later.";
                 } else if (errorType === 'network') {
                     errorMessage += " Please check your internet connection and try again.";
                 } else if (errorType === 'server') {
