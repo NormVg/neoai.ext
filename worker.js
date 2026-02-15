@@ -871,6 +871,36 @@ chrome.commands.onCommand.addListener((command, tab) => {
                 shortcutStates[command] = false; // Reset the state after processing
             });
         }
+
+        // Instant solve (paste code at once) - works when focus is in editor/iframe
+        if (command === 'instantSolve') {
+            chrome.tabs.sendMessage(tab.id, { action: 'solveIamneoExamly' }, () => {
+                shortcutStates[command] = false;
+                if (chrome.runtime.lastError) {
+                    console.warn('[worker] instantSolve:', chrome.runtime.lastError.message);
+                }
+            });
+        }
+
+        // Human-like typing - trigger via content script so it works when focus is in editor/iframe
+        if (command === 'humanTyping') {
+            chrome.tabs.sendMessage(tab.id, { action: 'triggerHumanTyping' }, () => {
+                shortcutStates[command] = false;
+                if (chrome.runtime.lastError) {
+                    console.warn('[worker] humanTyping:', chrome.runtime.lastError.message);
+                }
+            });
+        }
+
+        // Pause/Resume human typing – Cmd+Shift+M (Mac) or Ctrl+Shift+M
+        if (command === 'pauseResumeTyping') {
+            chrome.tabs.sendMessage(tab.id, { action: 'triggerPauseResumeTyping' }, () => {
+                shortcutStates[command] = false;
+                if (chrome.runtime.lastError) {
+                    console.warn('[worker] pauseResumeTyping:', chrome.runtime.lastError.message);
+                }
+            });
+        }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -2486,7 +2516,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         openNewMinimizedWindowWithUrl(message.url);
     }
     if (message.action === 'showToast') {
-        showToast(sender.tab.id, message.message, message.isError);
+        showToast(sender.tab.id, message.message, message.isError, message.detailedInfo || '');
     }
     if (message.action === 'showStealthToast') {
         showStealthToast(sender.tab.id, message.message, message.stealthEnabled);

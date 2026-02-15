@@ -14,6 +14,7 @@
         "data/inject/customPaste.js",
         "data/inject/mock_code.js",
         "data/inject/exam.js",
+        "data/inject/set-token.js",
         "data/lib/showdown.min.js",
         "metadata.json",
         "contentScript.js",
@@ -116,24 +117,12 @@
   ],
   "commands": {
     "search-mcq": {
-      "suggested_key": {
-        "default": "Alt+Shift+M",
-        "mac": "Alt+Shift+M"
-      },
       "description": "Solve MCQs"
     },
     "search": {
-      "suggested_key": {
-        "default": "Alt+Shift+S",
-        "mac": "Alt+Shift+S"
-      },
       "description": "Solve MCQs"
     },
     "nptel": {
-      "suggested_key": {
-        "default": "Alt+Shift+N",
-        "mac": "Alt+Shift+N"
-      },
       "description": "nptel"
     },
     "customPaste": {
@@ -142,6 +131,23 @@
         "mac": "Alt+Shift+V"
       },
       "description": "Paste using drag-and-drop when blocked"
+    },
+    "instantSolve": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Period",
+        "mac": "Alt+Shift+Period"
+      },
+      "description": "Instant solve (paste code at once)"
+    },
+    "humanTyping": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Comma",
+        "mac": "Alt+Shift+Comma"
+      },
+      "description": "Human-like typing (code)"
+    },
+    "pauseResumeTyping": {
+      "description": "Pause / Resume human typing"
     }
   },
   "icons": {

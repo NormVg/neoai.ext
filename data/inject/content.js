@@ -493,8 +493,14 @@ async function extractCodingQuestion() {
 }
 
 function solveIamneoExamly() {
-  // Login gate - silently require authentication
+  // Login gate - show feedback if not authenticated
   if (!_neoaiAuthToken) {
+    chrome.runtime.sendMessage({
+      action: 'showToast',
+      message: 'Please log in to use NeoAI',
+      isError: true,
+      detailedInfo: 'Click the extension icon and sign in at neoai.projectkit.shop'
+    });
     return;
   }
 
@@ -507,8 +513,9 @@ function solveIamneoExamly() {
   }
 }
 document.addEventListener('keydown', (event) => {
-  // Ctrl+Shift+. (Period) on all platforms
-  if (event.ctrlKey && event.shiftKey && event.code === 'Period') {
+  // Ctrl+Shift+. on Windows/Linux, Option+Shift+. on Mac
+  const mod = window.isMac ? event.altKey : event.ctrlKey;
+  if (mod && event.shiftKey && event.code === 'Period') {
     event.preventDefault();
     console.log('[content.js] Ctrl+Shift+. pressed, calling solveIamneoExamly...');
     solveIamneoExamly();
@@ -559,6 +566,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.action === 'solveIamneoExamly') {
     solveIamneoExamly();
+  }
+  // Human typing from extension command (works when focus is in editor/iframe)
+  if (message.action === 'triggerHumanTyping') {
+    document.dispatchEvent(new CustomEvent('neopass-trigger-human-typing', { bubbles: true }));
+  }
+  // Pause/Resume typing from extension command – Cmd+Shift+M (Mac) or Ctrl+Shift+M
+  if (message.action === 'triggerPauseResumeTyping') {
+    document.dispatchEvent(new CustomEvent('neopass-trigger-pause-resume-typing', { bubbles: true }));
   }
 });
 

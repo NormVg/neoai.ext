@@ -79,189 +79,123 @@ if (typeof window.isMac === 'undefined') {
     }
   }
 
+  // Shared: trigger human typing (used by both keydown and extension command)
+  function doTriggerHumanTyping() {
+    if (!window.__NEOAI_AUTH_TOKEN__) {
+      window.postMessage({
+        target: 'extension',
+        message: {
+          action: 'showToast',
+          message: 'Please log in to use NeoAI',
+          isError: true,
+          detailedInfo: 'Click the extension icon and sign in at neoai.projectkit.shop'
+        }
+      }, '*');
+      return;
+    }
+    if (typingInitialized && isTyping) {
+      typeNextCharacter();
+      return;
+    }
+    if (typingInitialized && !isTyping && currentCode) {
+      if (lineIndex < codeLines.length) {
+        isTyping = true;
+        typeNextCharacter();
+      }
+      return;
+    }
+    const isCodingQuestion = document.querySelector("#programme-compile");
+    if (!isCodingQuestion) return;
+    const questionElement = document.querySelector("#content-left > content-left > div > div.t-h-full > testtaking-question > div > div.t-flex.t-items-center.t-justify-between.t-whitespace-nowrap.t-px-10.t-py-8.lg\\:t-py-8.lg\\:t-px-20.t-bg-primary\\/\\[0\\.1\\].t-border-b.t-border-solid.t-border-b-neutral-2.t-min-h-\\[30px\\].lg\\:t-min-h-\\[35px\\].ng-star-inserted > div:nth-child(1) > div > div");
+    if (!questionElement) return;
+    const match = questionElement.textContent.match(/Question No : (\d+) \/ \d+/);
+    if (!match) return;
+    const editorElement = document.querySelector("div[aria-labelledby=\"editor-answer\"]");
+    if (!editorElement) return;
+    editor = ace.edit(editorElement);
+    async function getAnswerFromAI() {
+      try {
+        const programmingLanguageElement = document.querySelector('span.inner-text');
+        const programmingLanguage = programmingLanguageElement ? programmingLanguageElement.innerText.trim() : 'Programming language not found.';
+        const questionDataElement = document.querySelector('div[aria-labelledby="question-data"]');
+        const questionData = questionDataElement ? questionDataElement.innerText.trim() : 'Question not found.';
+        const inputFormatElement = document.querySelector('div[aria-labelledby="input-format"]');
+        const inputFormatText = inputFormatElement ? inputFormatElement.innerText.trim() : '';
+        const outputFormatElement = document.querySelector('div[aria-labelledby="output-format"]');
+        const outputFormatText = outputFormatElement ? outputFormatElement.innerText.trim() : '';
+        const testCases = [];
+        let containers = document.querySelectorAll('div[aria-labelledby="each-tc-card"]');
+        if (containers.length > 0) {
+          containers.forEach((container) => {
+            const inputPre = container.querySelector('div[aria-labelledby="each-tc-input-container"] pre');
+            const outputPre = container.querySelector('div[aria-labelledby="each-tc-output-container"] pre');
+            if (inputPre && outputPre) testCases.push({ input: inputPre.textContent.trim(), output: outputPre.textContent.trim() });
+          });
+        }
+        if (testCases.length === 0) {
+          containers = document.querySelectorAll('[aria-labelledby="each-tc-container"]');
+          if (containers.length > 0) {
+            containers.forEach((container) => {
+              const inputPre = container.querySelector('[aria-labelledby="each-tc-input"]');
+              const outputPre = container.querySelector('[aria-labelledby="each-tc-output"]');
+              if (inputPre && outputPre) testCases.push({ input: inputPre.textContent.trim(), output: outputPre.textContent.trim() });
+            });
+          }
+        }
+        if (testCases.length === 0) {
+          const allPres = document.querySelectorAll('pre');
+          const inputs = [];
+          const outputs = [];
+          allPres.forEach(pre => {
+            const text = pre.textContent.trim();
+            const prevElement = pre.previousElementSibling;
+            if (prevElement) {
+              const labelText = prevElement.textContent.toLowerCase();
+              if (labelText.includes('input') && !labelText.includes('output')) inputs.push(text);
+              else if (labelText.includes('output')) outputs.push(text);
+            }
+          });
+          for (let i = 0; i < Math.min(inputs.length, outputs.length); i++) testCases.push({ input: inputs[i], output: outputs[i] });
+        }
+        let testCasesText = testCases.length > 0
+          ? testCases.map((tc, i) => `Sample Test Case ${i + 1}:\nInput:\n${tc.input}\nOutput:\n${tc.output}\n\n`).join('')
+          : 'No test cases found. Please check the page structure.';
+        window.dispatchEvent(new CustomEvent('NEOPASS_REQUEST_CODE_TYPED', {
+          detail: { programmingLanguage: programmingLanguage, question: questionData, inputFormat: inputFormatText, outputFormat: outputFormatText, testCases: testCasesText }
+        }));
+        console.log('[exam.js] Dispatched NEOPASS_REQUEST_CODE_TYPED event');
+      } catch (error) {
+        console.error("Error getting answer from AI:", error);
+      }
+    }
+    getAnswerFromAI();
+  }
+
+  // Trigger human typing from extension command (works when focus is in editor/iframe)
+  window.addEventListener('neopass-trigger-human-typing', function () {
+    checkForQuestionChange();
+    console.log('[exam.js] Human typing triggered via extension command');
+    doTriggerHumanTyping();
+  });
+
   // Event listener for keyboard shortcuts
   document.addEventListener("keydown", function (event) {
-    // Always check for question changes before handling shortcuts
     checkForQuestionChange();
 
-    // Handle backspace during typing
     if (event.key === "Backspace" && isTyping) {
-      event.preventDefault(); // Prevent default backspace behavior
-      // Reset and start over
+      event.preventDefault();
       editor.setValue("");
-      editor.clearSelection(); // Clear selection
+      editor.clearSelection();
       charIndex = 0;
       lineIndex = 0;
       typeNextCharacter();
       return;
     }
 
-    // Ctrl+Shift+, (Comma) on all platforms
-    if (event.ctrlKey && event.shiftKey && event.code === 'Comma') {
+    if ((event.ctrlKey || event.altKey) && event.shiftKey && event.code === 'Comma') {
+      console.log('[exam.js] Option+Shift+, (Comma) pressed, calling getAnswerFromAI...');
       event.preventDefault();
-
-      // Login gate - silently require authentication
-      if (!window.__NEOAI_AUTH_TOKEN__) {
-        return;
-      }
-
-      // If already typing (code has been fetched), just continue typing
-      if (typingInitialized && isTyping) {
-        typeNextCharacter();
-        return;
-      }
-
-      // If typing is initialized but completed, just continue from where we left off
-      if (typingInitialized && !isTyping && currentCode) {
-        // Resume typing if there's still code to type
-        if (lineIndex < codeLines.length) {
-          isTyping = true;
-          typeNextCharacter();
-        }
-        return;
-      }
-
-      // Otherwise, initialize typing for the first time (fetch from AI)
-      const isCodingQuestion = document.querySelector("#programme-compile");
-
-      if (isCodingQuestion) {
-        const questionElement = document.querySelector("#content-left > content-left > div > div.t-h-full > testtaking-question > div > div.t-flex.t-items-center.t-justify-between.t-whitespace-nowrap.t-px-10.t-py-8.lg\\:t-py-8.lg\\:t-px-20.t-bg-primary\\/\\[0\\.1\\].t-border-b.t-border-solid.t-border-b-neutral-2.t-min-h-\\[30px\\].lg\\:t-min-h-\\[35px\\].ng-star-inserted > div:nth-child(1) > div > div");
-
-        if (questionElement) {
-          const questionText = questionElement.textContent;
-          const match = questionText.match(/Question No : (\d+) \/ \d+/);
-          let questionNumber = match ? parseInt(match[1]) : null;
-
-          if (questionNumber) {
-            const editorElement = document.querySelector("div[aria-labelledby=\"editor-answer\"]");
-
-            if (editorElement) {
-              editor = ace.edit(editorElement);
-
-              // Get answer from AI and type it (only on first press)
-              async function getAnswerFromAI() {
-                try {
-                  // Extract coding question details
-                  const programmingLanguageElement = document.querySelector('span.inner-text');
-                  const programmingLanguage = programmingLanguageElement ? programmingLanguageElement.innerText.trim() : 'Programming language not found.';
-
-                  const questionDataElement = document.querySelector('div[aria-labelledby="question-data"]');
-                  const questionData = questionDataElement ? questionDataElement.innerText.trim() : 'Question not found.';
-
-                  const inputFormatElement = document.querySelector('div[aria-labelledby="input-format"]');
-                  const inputFormatText = inputFormatElement ? inputFormatElement.innerText.trim() : '';
-
-                  const outputFormatElement = document.querySelector('div[aria-labelledby="output-format"]');
-                  const outputFormatText = outputFormatElement ? outputFormatElement.innerText.trim() : '';
-
-                  // Extract sample test cases with robust fallback method
-                  const testCases = [];
-
-                  // Try Method 1: Find test case containers with aria-labelledby="each-tc-card"
-                  let containers = document.querySelectorAll('div[aria-labelledby="each-tc-card"]');
-
-                  if (containers.length > 0) {
-                    console.log('[Test Cases] Method 1: Found', containers.length, 'test case containers');
-                    containers.forEach((container) => {
-                      const inputPre = container.querySelector('div[aria-labelledby="each-tc-input-container"] pre');
-                      const outputPre = container.querySelector('div[aria-labelledby="each-tc-output-container"] pre');
-
-                      if (inputPre && outputPre) {
-                        testCases.push({
-                          input: inputPre.textContent.trim(),
-                          output: outputPre.textContent.trim()
-                        });
-                      }
-                    });
-                  }
-
-                  // Try Method 2: Find by aria-labelledby="each-tc-container"
-                  if (testCases.length === 0) {
-                    console.log('[Test Cases] Method 1 failed. Trying Method 2...');
-                    containers = document.querySelectorAll('[aria-labelledby="each-tc-container"]');
-
-                    if (containers.length > 0) {
-                      console.log('[Test Cases] Method 2: Found', containers.length, 'test case containers');
-                      containers.forEach((container) => {
-                        const inputPre = container.querySelector('[aria-labelledby="each-tc-input"]');
-                        const outputPre = container.querySelector('[aria-labelledby="each-tc-output"]');
-
-                        if (inputPre && outputPre) {
-                          testCases.push({
-                            input: inputPre.textContent.trim(),
-                            output: outputPre.textContent.trim()
-                          });
-                        }
-                      });
-                    }
-                  }
-
-                  // Try Method 3: Find pre elements with Input/Output labels
-                  if (testCases.length === 0) {
-                    console.log('[Test Cases] Method 2 failed. Trying Method 3...');
-                    const allPres = document.querySelectorAll('pre');
-                    const inputs = [];
-                    const outputs = [];
-
-                    allPres.forEach(pre => {
-                      const text = pre.textContent.trim();
-                      const prevElement = pre.previousElementSibling;
-
-                      if (prevElement) {
-                        const labelText = prevElement.textContent.toLowerCase();
-                        if (labelText.includes('input') && !labelText.includes('output')) {
-                          inputs.push(text);
-                        } else if (labelText.includes('output')) {
-                          outputs.push(text);
-                        }
-                      }
-                    });
-
-                    console.log('[Test Cases] Method 3: Found', inputs.length, 'inputs and', outputs.length, 'outputs');
-
-                    // Pair inputs and outputs
-                    for (let i = 0; i < Math.min(inputs.length, outputs.length); i++) {
-                      testCases.push({
-                        input: inputs[i],
-                        output: outputs[i]
-                      });
-                    }
-                  }
-
-
-                  let testCasesText = '';
-                  if (testCases.length > 0) {
-                    testCases.forEach((testCase, index) => {
-                      testCasesText += `Sample Test Case ${index + 1}:\nInput:\n${testCase.input}\nOutput:\n${testCase.output}\n\n`;
-                    });
-                    console.log('[Test Cases] Successfully extracted', testCases.length, 'test cases');
-                  } else {
-                    console.warn('[Test Cases] All methods failed. No test cases extracted.');
-                    testCasesText = 'No test cases found. Please check the page structure.';
-                  }
-
-                  // Dispatch custom event to content.js to request AI answer
-                  const requestEvent = new CustomEvent('NEOPASS_REQUEST_CODE_TYPED', {
-                    detail: {
-                      programmingLanguage: programmingLanguage,
-                      question: questionData,
-                      inputFormat: inputFormatText,
-                      outputFormat: outputFormatText,
-                      testCases: testCasesText
-                    }
-                  });
-                  window.dispatchEvent(requestEvent);
-
-                  console.log('[exam.js] Dispatched NEOPASS_REQUEST_CODE_TYPED event');
-                } catch (error) {
-                  console.error("Error getting answer from AI:", error);
-                }
-              }
-              getAnswerFromAI();
-            }
-          }
-        }
-      }
+      doTriggerHumanTyping();
       return;
     }
 
@@ -343,7 +277,7 @@ if (typeof window.isMac === 'undefined') {
           // Check if paused
           if (isPaused) {
             currentTypingFunction = typeNextChar;
-            console.log('[exam.js] Typing paused. Press Ctrl+Shift+P to resume.');
+            console.log('[exam.js] Typing paused. Press Option+Shift+/ (Mac) or Ctrl+Shift+/ to resume.');
             return;
           }
 
@@ -413,24 +347,27 @@ if (typeof window.isMac === 'undefined') {
     }
   });
 
-  // Keyboard listener for Pause/Resume typing (Ctrl+Shift+/)
-  document.addEventListener('keydown', function (event) {
-    if (event.ctrlKey && event.shiftKey && event.code === 'Slash') {
-      event.preventDefault();
-
-      if (isTyping) {
-        isPaused = !isPaused;
-
-        if (isPaused) {
-          console.log('[exam.js] ⏸️ Typing PAUSED');
-        } else {
-          console.log('[exam.js] ▶️ Typing RESUMED');
-          // Resume typing if we have a stored function
-          if (currentTypingFunction) {
-            setTimeout(currentTypingFunction, 100);
-          }
-        }
+  function doPauseResumeTyping() {
+    if (!isTyping) return;
+    isPaused = !isPaused;
+    if (isPaused) {
+      console.log('[exam.js] ⏸️ Typing PAUSED');
+    } else {
+      console.log('[exam.js] ▶️ Typing RESUMED');
+      if (currentTypingFunction) {
+        setTimeout(currentTypingFunction, 100);
       }
+    }
+  }
+
+  // Pause/Resume via extension command (works when focus is in editor) – Cmd+Shift+M on Mac
+  window.addEventListener('neopass-trigger-pause-resume-typing', doPauseResumeTyping);
+
+  // Keyboard listener for Pause/Resume typing – Option+Shift+/ (Mac) or Ctrl+Shift+/
+  document.addEventListener('keydown', function (event) {
+    if ((event.ctrlKey || event.altKey) && event.shiftKey && event.code === 'Slash') {
+      event.preventDefault();
+      doPauseResumeTyping();
     }
   });
 })();

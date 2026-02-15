@@ -3,31 +3,52 @@ if (typeof chrome === "undefined") {
   // Handle the case where chrome is not defined (like in Firefox)
 }
 
-// Inject auth token into page context so content.js/exam.js can use it
-(function injectAuthToken() {
+// Inject auth token via external script (avoids CSP blocking inline scripts on exam pages)
+(function injectAuthTokenAndExam() {
   chrome.storage.local.get(['accessToken', 'loggedIn'], function(result) {
     const token = result.accessToken || '';
     const loggedIn = result.loggedIn || false;
-    const script = document.createElement('script');
-    script.textContent = `window.__NEOAI_AUTH_TOKEN__ = ${JSON.stringify(token)}; window.__NEOAI_LOGGED_IN__ = ${JSON.stringify(loggedIn)};`;
-    (document.head || document.documentElement).prepend(script);
-    script.remove();
+
+    // Use data attribute + external script - CSP on exam pages blocks inline scripts
+    const container = document.createElement('div');
+    container.id = 'neoai-token-container';
+    container.setAttribute('data-token', token);
+    container.setAttribute('data-logged-in', String(loggedIn));
+    container.style.display = 'none';
+    (document.head || document.documentElement).appendChild(container);
+
+    const setTokenScript = document.createElement('script');
+    setTokenScript.src = chrome.runtime.getURL('data/inject/set-token.js');
+    setTokenScript.onload = function() {
+      this.remove();
+      // Inject exam.js AFTER token is set
+      const examScript = document.createElement('script');
+      examScript.src = chrome.runtime.getURL('data/inject/exam.js');
+      (document.head || document.documentElement).appendChild(examScript);
+    };
+    (document.head || document.documentElement).appendChild(setTokenScript);
   });
 })();
 
-// Keep injected token updated when storage changes
+// Keep injected token updated when storage changes (use external script to avoid CSP)
 chrome.storage.onChanged.addListener(function(changes, area) {
   if (area === 'local' && (changes.accessToken || changes.loggedIn)) {
     const token = changes.accessToken ? (changes.accessToken.newValue || '') : undefined;
     const loggedIn = changes.loggedIn ? (changes.loggedIn.newValue || false) : undefined;
-    let code = '';
-    if (token !== undefined) code += `window.__NEOAI_AUTH_TOKEN__ = ${JSON.stringify(token)};`;
-    if (loggedIn !== undefined) code += `window.__NEOAI_LOGGED_IN__ = ${JSON.stringify(loggedIn)};`;
-    if (code) {
+    if (token !== undefined || loggedIn !== undefined) {
+      let el = document.getElementById('neoai-token-container');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'neoai-token-container';
+        el.style.display = 'none';
+        (document.head || document.documentElement).appendChild(el);
+      }
+      if (token !== undefined) el.setAttribute('data-token', token);
+      if (loggedIn !== undefined) el.setAttribute('data-logged-in', String(loggedIn));
       const script = document.createElement('script');
-      script.textContent = code;
-      (document.head || document.documentElement).prepend(script);
-      script.remove();
+      script.src = chrome.runtime.getURL('data/inject/set-token.js');
+      script.onload = function() { this.remove(); };
+      (document.head || document.documentElement).appendChild(script);
     }
   }
 });
@@ -46,11 +67,6 @@ chrome.storage.onChanged.addListener(function(changes, area) {
   // Inject as early as possible
   (document.head || document.documentElement).prepend(mockScript);
 })();
-
-// Inject exam.js (no login required)
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('data/inject/exam.js');
-(document.head || document.documentElement).appendChild(script);
 
 // Login prompt and status sync removed - extension features now available to all users
 
@@ -163,17 +179,6 @@ window.addEventListener("message", function(event) {
               response: response
           }, "*");
       });
-  }
-});
-
-window.addEventListener("message", function (event) {
-
-  if (event.source === window && event.data.target === "extension") {
-
-    browser.runtime.sendMessage(event.data.message, (response) => {
-
-      window.postMessage({ source: "extension", response: response }, "*");
-    });
   }
 });
 
